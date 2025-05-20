@@ -24,18 +24,17 @@ volatile uint32_t rx_buff_num_used=0;//接收缓冲区使用量
 volatile uint8_t rx_flag=0;//中断中，新接收到一个字符后在中断中置1
 volatile char rx_buff[usart_rx_buff_size];
 
-
 void timer3_init(void)
 {
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3,ENABLE);
-	
+
 	TIM_InternalClockConfig(TIM3);
-	
+
 	{
 		TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStruct;
-		
+
 		TIM_TimeBaseStructInit(&TIM_TimeBaseInitStruct);
-		
+
 		TIM_TimeBaseInitStruct.TIM_ClockDivision=TIM_CKD_DIV1;
 		TIM_TimeBaseInitStruct.TIM_CounterMode=TIM_CounterMode_Up;
 		TIM_TimeBaseInitStruct.TIM_Period=65536-1;//1us~65ms
@@ -43,78 +42,152 @@ void timer3_init(void)
 		TIM_TimeBaseInit(TIM3,&TIM_TimeBaseInitStruct);
 	}
 	TIM_Cmd(TIM3,ENABLE);
-	
-}
-void usart1_init(void)
-{
-	timer3_init();//USART的中断接收功能使用
-	
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1|RCC_APB2Periph_GPIOA,ENABLE );
-	
-    GPIO_InitTypeDef GPIO_InitStruct;
-    GPIO_InitStruct.GPIO_Mode=GPIO_Mode_AF_PP;
-    GPIO_InitStruct.GPIO_Pin=GPIO_Pin_9;
-    GPIO_InitStruct.GPIO_Speed=GPIO_Speed_50MHz;
-    GPIO_Init(GPIOA,&GPIO_InitStruct);
-    GPIO_InitStruct.GPIO_Mode=GPIO_Mode_IN_FLOATING;
-    GPIO_InitStruct.GPIO_Pin=GPIO_Pin_10;
-    GPIO_Init(GPIOA,&GPIO_InitStruct);
-
-    USART_InitTypeDef USART_InitStruct;
-    USART_InitStruct.USART_BaudRate=usart_rx_baud;
-    USART_InitStruct.USART_HardwareFlowControl=USART_HardwareFlowControl_None;
-    USART_InitStruct.USART_Mode=USART_Mode_Tx | USART_Mode_Rx;
-    USART_InitStruct.USART_Parity=USART_Parity_No;
-    USART_InitStruct.USART_StopBits=USART_StopBits_1;
-    USART_InitStruct.USART_WordLength=USART_WordLength_8b;
-    USART_Init(USART1,&USART_InitStruct);
-
-	USART_ITConfig(USART1,USART_IT_RXNE,ENABLE);
-	
-	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
-	NVIC_InitTypeDef NVIC_InitStruct;
-    NVIC_InitStruct.NVIC_IRQChannel=USART1_IRQn;
-    NVIC_InitStruct.NVIC_IRQChannelCmd=ENABLE;
-    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority=3;
-    NVIC_InitStruct.NVIC_IRQChannelSubPriority=0;
-    NVIC_Init(&NVIC_InitStruct);
-	
-    USART_Cmd(USART1,ENABLE );
-	
 }
 
-void usart1_send_Char(uint8_t character)
-{
-    USART_SendData(USART1,character);
-    while(USART_GetFlagStatus(USART1,USART_FLAG_TXE) == RESET);
-}
-
-void usart_send_str(char *str)
-{
-    while(*str)
-    {
-        usart1_send_Char(*str++);
-    }
-}
-int fputc(int ch, FILE *f)
-{
-  /* Your implementation of fputc(). */
-	usart1_send_Char(ch);
-  return ch;
-}
-void USART1_IRQHandler(void)
-{
-	if(USART_GetITStatus(USART1,USART_IT_RXNE) == SET)
+#if (usartx == 1)
+	void usart1_init(void)
 	{
-		if(rx_buff_num_used < usart_rx_buff_size-1) //-1是为了保证缓冲区满了之后，最后一位是'\0'终止符;
-		{
-			rx_buff[rx_buff_num_used++] = USART_ReceiveData(USART1);
-			rx_flag=1;
-			TIM3->CNT=0;
-		}
-		else USART_ReceiveData(USART1);//缓冲区满了后，读接收寄存器用于清除RXNE标志位;
+		timer3_init();//USART的中断接收功能使用
+	    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1|RCC_APB2Periph_GPIOA,ENABLE );
+
+	    GPIO_InitTypeDef GPIO_InitStruct;
+	    GPIO_InitStruct.GPIO_Mode=GPIO_Mode_AF_PP;
+	    GPIO_InitStruct.GPIO_Pin=GPIO_Pin_9;
+	    GPIO_InitStruct.GPIO_Speed=GPIO_Speed_50MHz;
+	    GPIO_Init(GPIOA,&GPIO_InitStruct);
+	    GPIO_InitStruct.GPIO_Mode=GPIO_Mode_IN_FLOATING;
+	    GPIO_InitStruct.GPIO_Pin=GPIO_Pin_10;
+	    GPIO_Init(GPIOA,&GPIO_InitStruct);
+
+	    USART_InitTypeDef USART_InitStruct;
+	    USART_InitStruct.USART_BaudRate=usart_rx_baud;
+	    USART_InitStruct.USART_HardwareFlowControl=USART_HardwareFlowControl_None;
+	    USART_InitStruct.USART_Mode=USART_Mode_Tx | USART_Mode_Rx;
+	    USART_InitStruct.USART_Parity=USART_Parity_No;
+	    USART_InitStruct.USART_StopBits=USART_StopBits_1;
+	    USART_InitStruct.USART_WordLength=USART_WordLength_8b;
+	    USART_Init(USART1,&USART_InitStruct);
+
+		USART_ITConfig(USART1,USART_IT_RXNE,ENABLE);
+
+		NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
+		NVIC_InitTypeDef NVIC_InitStruct;
+	    NVIC_InitStruct.NVIC_IRQChannel=USART1_IRQn;
+	    NVIC_InitStruct.NVIC_IRQChannelCmd=ENABLE;
+	    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority=3;
+	    NVIC_InitStruct.NVIC_IRQChannelSubPriority=0;
+	    NVIC_Init(&NVIC_InitStruct);
+
+	    USART_Cmd(USART1,ENABLE );	
 	}
-}
+
+	void usart1_send_Char(uint8_t character)
+	{
+	    USART_SendData(USART1,character);
+	    while(USART_GetFlagStatus(USART1,USART_FLAG_TXE) == RESET);
+	}
+
+	void usart1_send_str(char *str)
+	{
+	    while(*str)
+	    {
+	        usart1_send_Char(*str++);
+	    }
+	}
+
+	int fputc(int ch, FILE *f)
+	{
+	  /* Your implementation of fputc(). */
+		usart1_send_Char(ch);
+	  return ch;
+	}
+
+	void USART1_IRQHandler(void)
+	{
+		if(USART_GetITStatus(USART1,USART_IT_RXNE) == SET)
+		{
+			if(rx_buff_num_used < usart_rx_buff_size-1) //-1是为了保证缓冲区满了之后，最后一位是'\0'终止符;
+			{
+				rx_buff[rx_buff_num_used++] = USART_ReceiveData(USART1);
+				rx_flag=1;
+				TIM3->CNT=0;
+			}
+			else USART_ReceiveData(USART1);//缓冲区满了后，读接收寄存器用于清除RXNE标志位;
+		}
+	}
+#elif (usartx ==2)
+	void usart2_init(void)
+	{
+		timer3_init();//USART的中断接收功能使用
+	    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA,ENABLE );
+		RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2,ENABLE);
+
+	    GPIO_InitTypeDef GPIO_InitStruct;
+	    GPIO_InitStruct.GPIO_Mode=GPIO_Mode_AF_PP;
+	    GPIO_InitStruct.GPIO_Pin=GPIO_Pin_2;
+	    GPIO_InitStruct.GPIO_Speed=GPIO_Speed_50MHz;
+	    GPIO_Init(GPIOA,&GPIO_InitStruct);
+	    GPIO_InitStruct.GPIO_Mode=GPIO_Mode_IN_FLOATING;
+	    GPIO_InitStruct.GPIO_Pin=GPIO_Pin_3;
+	    GPIO_Init(GPIOA,&GPIO_InitStruct);
+
+	    USART_InitTypeDef USART_InitStruct;
+	    USART_InitStruct.USART_BaudRate=usart_rx_baud;
+	    USART_InitStruct.USART_HardwareFlowControl=USART_HardwareFlowControl_None;
+	    USART_InitStruct.USART_Mode=USART_Mode_Tx | USART_Mode_Rx;
+	    USART_InitStruct.USART_Parity=USART_Parity_No;
+	    USART_InitStruct.USART_StopBits=USART_StopBits_1;
+	    USART_InitStruct.USART_WordLength=USART_WordLength_8b;
+	    USART_Init(USART2,&USART_InitStruct);
+
+		USART_ITConfig(USART2,USART_IT_RXNE,ENABLE);
+
+		NVIC_PriorityGroupConfig(NVIC_PriorityGroup_4);
+		NVIC_InitTypeDef NVIC_InitStruct;
+	    NVIC_InitStruct.NVIC_IRQChannel=USART2_IRQn;
+	    NVIC_InitStruct.NVIC_IRQChannelCmd=ENABLE;
+	    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority=3;
+	    NVIC_InitStruct.NVIC_IRQChannelSubPriority=0;
+	    NVIC_Init(&NVIC_InitStruct);
+
+	    USART_Cmd(USART2,ENABLE );	
+	}
+
+	void usart2_send_Char(uint8_t character)
+	{
+	    USART_SendData(USART2,character);
+	    while(USART_GetFlagStatus(USART2,USART_FLAG_TXE) == RESET);
+	}
+
+	void usart2_send_str(char *str)
+	{
+	    while(*str)
+	    {
+	        usart2_send_Char(*str++);
+	    }
+	}
+
+	int fputc(int ch, FILE *f)
+	{
+	  /* Your implementation of fputc(). */
+		usart2_send_Char(ch);
+	  return ch;
+	}
+
+	void USART2_IRQHandler(void)
+	{
+		if(USART_GetITStatus(USART2,USART_IT_RXNE) == SET)
+		{
+			if(rx_buff_num_used < usart_rx_buff_size-1) //-1是为了保证缓冲区满了之后，最后一位是'\0'终止符;
+			{
+				rx_buff[rx_buff_num_used++] = USART_ReceiveData(USART2);
+				rx_flag=1;
+				TIM3->CNT=0;
+			}
+			else USART_ReceiveData(USART2);//缓冲区满了后，读接收寄存器用于清除RXNE标志位;
+		}
+	}
+#endif
 
 /*接收缓冲区与命令集某一个命令匹配时会进入该函数一次;
 param:传进的cmd_num表示与命令集数组中的第几个元素匹配，范围：[0,cmd_count]
