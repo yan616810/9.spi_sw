@@ -31,7 +31,7 @@ u8 MPU_Init(void)
 		MPU_Write_Byte(MPU_PWR_MGMT1_REG,0X01);	//唤醒MPU6050 && 使用x轴时钟,必须先唤醒，否则无法写某些寄存器
 		MPU_Set_Gyro_Fsr(0);					//陀螺仪传感器,±250dps
 		MPU_Set_Accel_Fsr(0);					//加速度传感器,±2g
-		MPU_Set_Rate(50);						//设置采样率50Hz，据奈奎斯特，实际能够使用的信号的频谱最大频率为25HZ，再高频的震荡看作噪声由DLPF滤去
+		MPU_Set_Rate(200);						//设置采样率200Hz，据奈奎斯特，实际能够使用的信号的频谱最大频率为100HZ，再高频的震荡看作噪声由DLPF滤去
 		MPU_Write_Byte(MPU_INT_EN_REG,0X00);		//关闭所有中断
 		MPU_Write_Byte(MPU_USER_CTRL_REG,0X00);	//I2C主模式关闭
 		MPU_Write_Byte(MPU_FIFO_EN_REG,0X00);		//关闭FIFO

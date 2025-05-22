@@ -7,10 +7,10 @@
 #include "inv_mpu_dmp_motion_driver.h"
 #include "dmpKey.h"
 #include "dmpmap.h"
-#include "delay.h"
+#include "Delay.h"
 
 //定义目标板采用MSP430
-#define  MOTION_DRIVER_TARGET_MSP430
+#define  MOTION_DRIVER_TARGET_stm32f103
 
 /* The following functions must be defined for this platform:
  * i2c_write(unsigned char slave_addr, unsigned char reg_addr,
@@ -20,10 +20,11 @@
  * delay_ms(unsigned long num_ms)
  * get_ms(unsigned long *count)
  */
-#if defined MOTION_DRIVER_TARGET_MSP430
+#if defined MOTION_DRIVER_TARGET_stm32f103
 //#include "msp430.h"
 //#include "msp430_clock.h"
-#define delay_ms    delay_ms
+#include "iic.h"
+#define delay_ms    Delay_ms
 #define get_ms      mget_ms
 #define log_i 		printf
 #define log_e  		printf
@@ -623,7 +624,8 @@ int dmp_set_accel_bias(long *bias)
 
     mpu_get_accel_sens(&accel_sens);
     accel_sf = (long long)accel_sens << 15;
-    //__no_operation();
+    __NOP();
+    // __no_operation();
 
     accel_bias_body[0] = bias[dmp.orient & 3];
     if (dmp.orient & 4)
@@ -1299,7 +1301,7 @@ int dmp_read_fifo(short *gyro, short *accel, long *quat,
             /* Quaternion is outside of the acceptable threshold. */
             mpu_reset_fifo();
             sensors[0] = 0;
-            return -1;
+            return -2;
         }
         sensors[0] |= INV_WXYZ_QUAT;
 #endif

@@ -6,12 +6,11 @@
 #include "inv_mpu.h"
 #include "inv_mpu_dmp_motion_driver.h"
 #include "mpu6050.h"
-#include "delay.h"
-
+#include "Delay.h"
 
 
 #define MPU6050							//定义我们使用的传感器为MPU6050
-#define MOTION_DRIVER_TARGET_MSP430		//定义驱动部分,采用MSP430的驱动(移植到STM32F1)
+#define MOTION_DRIVER_TARGET_stm32f103		//定义驱动部分,采用MSP430的驱动(移植到STM32F1)
 
 /* The following functions must be defined for this platform:
  * i2c_write(unsigned char slave_addr, unsigned char reg_addr,
@@ -25,15 +24,15 @@
  * fabsf(float x)
  * min(int a, int b)
  */
-#if defined MOTION_DRIVER_TARGET_MSP430
+#if defined MOTION_DRIVER_TARGET_stm32f103
 //#include "msp430.h"
 //#include "msp430_i2c.h"
 //#include "msp430_clock.h"
 //#include "msp430_interrupt.h"
-
-#define i2c_write   MPU_Write_Len
-#define i2c_read    MPU_Read_Len
-#define delay_ms    delay_ms
+#include "iic.h"
+#define i2c_write(addr,reg,num,p_buf)   IIC_Write_Len(addr,reg,num,p_buf)
+#define i2c_read(addr,reg,num,p_buf)    IIC_Read_Len(addr,reg,num,p_buf)
+#define delay_ms    Delay_ms
 #define get_ms      mget_ms
 //static inline int reg_int_cb(struct int_param_s *int_param)
 //{
@@ -2846,10 +2845,8 @@ lp_int_restore:
 //Copyright(C) 广州市星翼电子科技有限公司 2009-2019
 //All rights reserved									  
 ////////////////////////////////////////////////////////////////////////////////// 
-
 //q30格式,long转float时的除数.
 #define q30  1073741824.0f
-
 //陀螺仪方向设置
 static signed char gyro_orientation[9] = { 1, 0, 0,
                                            0, 1, 0,
@@ -2896,19 +2893,15 @@ unsigned short inv_orientation_matrix_to_scalar(
        ZXY  001_000_010
        ZYX  000_001_010
      */
-
     scalar = inv_row_2_scale(mtx);
     scalar |= inv_row_2_scale(mtx + 3) << 3;
     scalar |= inv_row_2_scale(mtx + 6) << 6;
-
-
     return scalar;
 }
 //方向转换
 unsigned short inv_row_2_scale(const signed char *row)
 {
     unsigned short b;
-
     if (row[0] > 0)
         b = 0;
     else if (row[0] < 0)
@@ -2925,18 +2918,20 @@ unsigned short inv_row_2_scale(const signed char *row)
         b = 7;      // error
     return b;
 }
+
 //空函数,未用到.
 void mget_ms(unsigned long *time)
 {
 
 }
+
 //mpu6050,dmp初始化
 //返回值:0,正常
 //    其他,失败
 u8 mpu_dmp_init(void)
 {
 	u8 res=0;
-	MPU_IIC_Init(); 	//初始化IIC总线
+	// MPU_IIC_Init(); 	//初始化IIC总线
 	if(mpu_init()==0)	//初始化MPU6050
 	{	 
 		res=mpu_set_sensors(INV_XYZ_GYRO|INV_XYZ_ACCEL);//设置所需要的传感器

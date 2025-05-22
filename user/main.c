@@ -18,16 +18,20 @@
 #include "USART.h"
 #include <stdio.h>
 #include "iic.h"
-// #include "mpu6050.h"
+#include "mpu6050.h"
 #include "u8g2_monochrome_display.h"
 #include <string.h>//memset
 #include "hw_iic.h"
 #include "Encoder.h"
+// #include "mpu6050_dmp.h"
+#include "inv_mpu.h"
+
+#define dmp_get_fifo  10
 
 volatile uint16_t second_cnt=1000;
 volatile uint8_t key_cnt=10,key_task_cnt=10;
 volatile uint8_t ms_cnt=100;
-volatile uint8_t ms_25_cnt=25;
+volatile uint8_t ms_25_cnt=dmp_get_fifo;
 /*RTC*/
 Type_Struct_Timezone_and_UTCxTime RTC_Init_And_Adjustment,RTC_read_RTCStruct;
 
@@ -37,12 +41,20 @@ char u8g2_buf[18];
 
 uint16_t second;
 
-uint8_t ii=1;
-
 uint8_t smg_ui_root;
 
 int16_t encoder_value;
-// short gx,gy,gz,ax,ay,az;
+
+int dmp_result;
+float pitch,roll,yaw;
+char niming[13]={0xaa,0xff,0x03,7,};
+int16_t roll_temp;
+int16_t pitch_temp;
+int16_t yaw_temp;
+uint8_t sumcheck; 
+uint8_t addcheck; 
+
+short gx,gy,gz,ax,ay,az;
 
 void timer2_init(void)
 {
@@ -105,7 +117,7 @@ void task_proc(void)
 	if(second_cnt == 1000)//1s
 	{
 		second_cnt=0;
-		printf("[--YLAD--]\r\n");
+		// printf("[--YLAD--]\r\n");
 				
 	}
 	if(key_cnt==10)//10ms
@@ -122,13 +134,14 @@ void task_proc(void)
 	}
 	if(ms_cnt==100)//100ms
 	{
-		ms_cnt=0;		
-		// //将上一次画布缓冲区角速度旧值区域填充空Box
+		ms_cnt=0;
+//mpu6050
+		// // 将上一次画布缓冲区角速度旧值区域填充空Box
 		// u8g2_SetDrawColor(&u8g2,0);
 		// u8g2_DrawBox(&u8g2,2*7,0*10,6*7,10);
 		// u8g2_DrawBox(&u8g2,2*7,1*10,6*7,10);
 		// u8g2_DrawBox(&u8g2,2*7,2*10,6*7,10);
-		// //在缓冲区空Box处写入角速度数据
+		// // 在缓冲区空Box处写入角速度数据
 		// u8g2_SetDrawColor(&u8g2,1);
 		// memset(u8g2_buf, 0, sizeof(u8g2_buf));  // 将数组所有字节设为0
 		// sprintf(u8g2_buf,"%+6d",gx);
@@ -139,12 +152,12 @@ void task_proc(void)
 		// memset(u8g2_buf,0,sizeof(u8g2_buf));
 		// sprintf(u8g2_buf,"%+6d",gz);
 		// u8g2_DrawStr(&u8g2,2*7,2*10,u8g2_buf);
-		// //将上一次画布缓冲区重力加速度旧值区域填充空Box
+		// // 将上一次画布缓冲区重力加速度旧值区域填充空Box
 		// u8g2_SetDrawColor(&u8g2,0);
 		// u8g2_DrawBox(&u8g2,11*7,0*10,6*7,10);
 		// u8g2_DrawBox(&u8g2,11*7,1*10,6*7,10);
 		// u8g2_DrawBox(&u8g2,11*7,2*10,6*7,10);
-		// //在缓冲区空Box处写入重力加速度数据
+		// // 在缓冲区空Box处写入重力加速度数据
 		// u8g2_SetDrawColor(&u8g2,1);
 		// memset(u8g2_buf, 0, sizeof(u8g2_buf));  // 将数组所有字节设为0
 		// sprintf(u8g2_buf,"%+6d",ax);
@@ -155,97 +168,127 @@ void task_proc(void)
 		// memset(u8g2_buf,0,sizeof(u8g2_buf));
 		// sprintf(u8g2_buf,"%+6d",az);
 		// u8g2_DrawStr(&u8g2,11*7,2*10,u8g2_buf);
+//RTC
+		// memset(u8g2_buf, 0, sizeof(u8g2_buf));
+		// sprintf(u8g2_buf,"%4d",RTC_read_RTCStruct.UTCxTime.tm_year);
+		// u8g2_SetDrawColor(&u8g2,0);
+		// u8g2_DrawBox(&u8g2,5*7,0*10,4*7,10);
+		// u8g2_SetDrawColor(&u8g2,1);
+		// u8g2_DrawStr(&u8g2,5*7,0*10,u8g2_buf);
 
-		memset(u8g2_buf, 0, sizeof(u8g2_buf));
-		sprintf(u8g2_buf,"%4d",RTC_read_RTCStruct.UTCxTime.tm_year);
-		u8g2_SetDrawColor(&u8g2,0);
-		u8g2_DrawBox(&u8g2,5*7,0*10,4*7,10);
-		u8g2_SetDrawColor(&u8g2,1);
-		u8g2_DrawStr(&u8g2,5*7,0*10,u8g2_buf);
+		// memset(u8g2_buf, 0, sizeof(u8g2_buf));
+		// sprintf(u8g2_buf,"%2d",RTC_read_RTCStruct.UTCxTime.tm_mon);
+		// u8g2_SetDrawColor(&u8g2,0);
+		// u8g2_DrawBox(&u8g2,5*7,1*10,2*7,10);
+		// u8g2_SetDrawColor(&u8g2,1);
+		// u8g2_DrawStr(&u8g2,5*7,1*10,u8g2_buf);
 
-		memset(u8g2_buf, 0, sizeof(u8g2_buf));
-		sprintf(u8g2_buf,"%2d",RTC_read_RTCStruct.UTCxTime.tm_mon);
-		u8g2_SetDrawColor(&u8g2,0);
-		u8g2_DrawBox(&u8g2,5*7,1*10,2*7,10);
-		u8g2_SetDrawColor(&u8g2,1);
-		u8g2_DrawStr(&u8g2,5*7,1*10,u8g2_buf);
+		// memset(u8g2_buf, 0, sizeof(u8g2_buf));
+		// sprintf(u8g2_buf,"%2d",RTC_read_RTCStruct.UTCxTime.tm_mday);
+		// u8g2_SetDrawColor(&u8g2,0);
+		// u8g2_DrawBox(&u8g2,5*7,2*10,2*7,10);
+		// u8g2_SetDrawColor(&u8g2,1);
+		// u8g2_DrawStr(&u8g2,5*7,2*10,u8g2_buf);		
 
-		memset(u8g2_buf, 0, sizeof(u8g2_buf));
-		sprintf(u8g2_buf,"%2d",RTC_read_RTCStruct.UTCxTime.tm_mday);
-		u8g2_SetDrawColor(&u8g2,0);
-		u8g2_DrawBox(&u8g2,5*7,2*10,2*7,10);
-		u8g2_SetDrawColor(&u8g2,1);
-		u8g2_DrawStr(&u8g2,5*7,2*10,u8g2_buf);		
+		// memset(u8g2_buf, 0, sizeof(u8g2_buf));
+		// sprintf(u8g2_buf,"%02d",RTC_read_RTCStruct.UTCxTime.tm_hour);
+		// u8g2_SetDrawColor(&u8g2,0);
+		// u8g2_DrawBox(&u8g2,5*7,3*10,2*7,10);
+		// u8g2_SetDrawColor(&u8g2,1);
+		// u8g2_DrawStr(&u8g2,5*7,3*10,u8g2_buf);
 
-		memset(u8g2_buf, 0, sizeof(u8g2_buf));
-		sprintf(u8g2_buf,"%02d",RTC_read_RTCStruct.UTCxTime.tm_hour);
-		u8g2_SetDrawColor(&u8g2,0);
-		u8g2_DrawBox(&u8g2,5*7,3*10,2*7,10);
-		u8g2_SetDrawColor(&u8g2,1);
-		u8g2_DrawStr(&u8g2,5*7,3*10,u8g2_buf);
+		// memset(u8g2_buf, 0, sizeof(u8g2_buf));
+		// sprintf(u8g2_buf,"%02d",RTC_read_RTCStruct.UTCxTime.tm_min);
+		// u8g2_SetDrawColor(&u8g2,0);
+		// u8g2_DrawBox(&u8g2,5*7,4*10,2*7,10);
+		// u8g2_SetDrawColor(&u8g2,1);
+		// u8g2_DrawStr(&u8g2,5*7,4*10,u8g2_buf);
 
-		memset(u8g2_buf, 0, sizeof(u8g2_buf));
-		sprintf(u8g2_buf,"%02d",RTC_read_RTCStruct.UTCxTime.tm_min);
-		u8g2_SetDrawColor(&u8g2,0);
-		u8g2_DrawBox(&u8g2,5*7,4*10,2*7,10);
-		u8g2_SetDrawColor(&u8g2,1);
-		u8g2_DrawStr(&u8g2,5*7,4*10,u8g2_buf);
+		// memset(u8g2_buf, 0, sizeof(u8g2_buf));
+		// sprintf(u8g2_buf,"%02d",RTC_read_RTCStruct.UTCxTime.tm_sec);
+		// u8g2_SetDrawColor(&u8g2,0);
+		// u8g2_DrawBox(&u8g2,5*7,5*10,2*7,10);
+		// u8g2_SetDrawColor(&u8g2,1);
+		// u8g2_DrawStr(&u8g2,5*7,5*10,u8g2_buf);
+		// //时间戳
+		// memset(u8g2_buf, 0, sizeof(u8g2_buf));
+		// sprintf(u8g2_buf,"%10lu",RTC_read_Timestamp());
+		// u8g2_SetDrawColor(&u8g2,0);
+		// u8g2_DrawBox(&u8g2,8*7,5*10,10*7,10);
+		// u8g2_SetDrawColor(&u8g2,1);
+		// u8g2_DrawStr(&u8g2,8*7,5*10,u8g2_buf);
+		// //编码器值
+		// memset(u8g2_buf, 0, sizeof(u8g2_buf));
+		// sprintf(u8g2_buf,"%+06d",encoder_value);
+		// u8g2_SetDrawColor(&u8g2,0);
+		// u8g2_DrawBox(&u8g2,8*7,4*10,6*7,10);
+		// u8g2_SetDrawColor(&u8g2,1);
+		// u8g2_DrawStr(&u8g2,8*7,4*10,u8g2_buf);
 
-		memset(u8g2_buf, 0, sizeof(u8g2_buf));
-		sprintf(u8g2_buf,"%02d",RTC_read_RTCStruct.UTCxTime.tm_sec);
-		u8g2_SetDrawColor(&u8g2,0);
-		u8g2_DrawBox(&u8g2,5*7,5*10,2*7,10);
-		u8g2_SetDrawColor(&u8g2,1);
-		u8g2_DrawStr(&u8g2,5*7,5*10,u8g2_buf);
-		//时间戳
-		memset(u8g2_buf, 0, sizeof(u8g2_buf));
-		sprintf(u8g2_buf,"%10lu",RTC_read_Timestamp());
-		u8g2_SetDrawColor(&u8g2,0);
-		u8g2_DrawBox(&u8g2,8*7,5*10,10*7,10);
-		u8g2_SetDrawColor(&u8g2,1);
-		u8g2_DrawStr(&u8g2,8*7,5*10,u8g2_buf);
-		//编码器值
-		memset(u8g2_buf, 0, sizeof(u8g2_buf));
-		sprintf(u8g2_buf,"%+06d",encoder_value);
-		u8g2_SetDrawColor(&u8g2,0);
-		u8g2_DrawBox(&u8g2,8*7,4*10,6*7,10);
-		u8g2_SetDrawColor(&u8g2,1);
-		u8g2_DrawStr(&u8g2,8*7,4*10,u8g2_buf);
-
-		u8g2_SendBuffer(&u8g2);
+		// u8g2_SendBuffer(&u8g2);
 	}
-	if(ms_25_cnt==25)
+	if(ms_25_cnt==dmp_get_fifo)
 	{
 		ms_25_cnt=0;
+
+		if(mpu_dmp_get_data(&pitch,&roll,&yaw)!=0){/*printf("error\r\n");*/}//返回值:0,DMP成功解出欧拉角   
+        // else printf("pitch->%f\troll->%f\tyaw->%f\r\n",pitch,roll,yaw);
+		else{
+		roll_temp = roll*100;
+		pitch_temp = pitch*100;
+		yaw_temp = yaw*100;
+		sumcheck = 0; 
+		addcheck = 0; 
+		niming[4]=(uint8_t)(roll_temp);
+		niming[5]=(uint8_t)(roll_temp>>8);
+		niming[6]=(uint8_t)(pitch_temp);
+		niming[7]=(uint8_t)(pitch_temp>>8);
+		niming[8]=(uint8_t)(yaw_temp);
+		niming[9]=(uint8_t)(yaw_temp>>8);
+		niming[10]=0x01;
+		for(uint8_t i=0; i < (niming[3]+4); i++) 
+		{ 
+			sumcheck += niming[i];  
+			addcheck += sumcheck;  
+		}
+		niming[11]=sumcheck;
+		niming[12]=addcheck;
+		for(uint8_t i=0;i<13;i++)
+		{
+			usart1_send_Char(niming[i]);
+		}
+	}
+
 		// MPU_Get_Gyroscope(&gx,&gy,&gz);
 		// MPU_Get_Accelerometer(&ax,&ay,&az);
 	//RTC实时时钟
-		RTC_get_DataStruct(&RTC_read_RTCStruct,&RTC_Init_And_Adjustment);
+		// RTC_get_DataStruct(&RTC_read_RTCStruct,&RTC_Init_And_Adjustment);
 	//编码器
-		encoder_value = Encoder_get_value();
+		// encoder_value = Encoder_get_value();
 	}
 }
 
 int main(void)
 {
 /*编码器*/
-	Encoder_init();
+	// Encoder_init();
 /*按键初始化*/
 	key_init();
 /*串口初始化*/
-	usart2_init();
+	usart1_init();
 /*IIC协议端口初始化 && 以极低的协议速度搜索iic设备并通过串口打印地址信息*/
 	IIC_InitPins_or_ChangePins(RCC_APB2Periph_GPIOB,GPIOB,GPIO_Pin_8,RCC_APB2Periph_GPIOB,GPIOB,GPIO_Pin_9);
 	IIC_Set_speed(10);//防止iic协议速度过快，搜索不到低速设备
 	IIC_Search_all_devices_printf_example();
 	IIC_Set_speed(1);
 /*oled初始化*/
-	u8g2_oled_init(&u8g2);
+	// u8g2_oled_init(&u8g2);
 	// u8g2_oled_play_Animation(&u8g2);
-	u8g2_SetFont(&u8g2,u8g2_font_courB08_tr);//w=7  h=10
-	u8g2_SetFontPosTop(&u8g2);
-	u8g2_SetFontMode(&u8g2,0);//显示字体的背景，不透明
-	u8g2_SetDrawColor(&u8g2,1);
+	// u8g2_SetFont(&u8g2,u8g2_font_courB08_tr);//w=7  h=10
+	// u8g2_SetFontPosTop(&u8g2);
+	// u8g2_SetFontMode(&u8g2,0);//显示字体的背景，不透明
+	// u8g2_SetDrawColor(&u8g2,1);
+
 	// u8g2_DrawStr(&u8g2,0,0*10,"X=");
 	// u8g2_DrawStr(&u8g2,0,1*10,"Y=");
 	// u8g2_DrawStr(&u8g2,0,2*10,"Z=");
@@ -255,22 +298,29 @@ int main(void)
 	// u8g2_DrawStr(&u8g2,9*7,2*10,"Z=");
 	// u8g2_DrawStr(&u8g2,9*7,3*10,"Acce");
 
-	u8g2_DrawStr(&u8g2,0,0,"RTC initing...");
-
-	u8g2_SendBuffer(&u8g2);
+	// u8g2_SendBuffer(&u8g2);
 /*片上RTC时钟初始化*/
-	RTC_Filling_DataStruct(&RTC_Init_And_Adjustment,8,2025,5,20,11,25,0,-1);
-	RTC_init(&RTC_Init_And_Adjustment);
-	u8g2_ClearBuffer(&u8g2);
-	u8g2_DrawStr(&u8g2,0,0,"year->");
-	u8g2_DrawStr(&u8g2,0,1*10,"mon ->");
-	u8g2_DrawStr(&u8g2,0,2*10,"day ->");
-	u8g2_DrawStr(&u8g2,0,3*10,"hour->");
-	u8g2_DrawStr(&u8g2,0,4*10,"min ->");
-	u8g2_DrawStr(&u8g2,0,5*10,"sec ->");
-	u8g2_SendBuffer(&u8g2);
+	// u8g2_DrawStr(&u8g2,0,0,"RTC initing...");
+	// RTC_Filling_DataStruct(&RTC_Init_And_Adjustment,8,2025,5,20,11,25,0,-1);
+	// RTC_init(&RTC_Init_And_Adjustment);
+	// u8g2_ClearBuffer(&u8g2);
+	// u8g2_DrawStr(&u8g2,0,0,"year->");
+	// u8g2_DrawStr(&u8g2,0,1*10,"mon ->");
+	// u8g2_DrawStr(&u8g2,0,2*10,"day ->");
+	// u8g2_DrawStr(&u8g2,0,3*10,"hour->");
+	// u8g2_DrawStr(&u8g2,0,4*10,"min ->");
+	// u8g2_DrawStr(&u8g2,0,5*10,"sec ->");
+	// u8g2_SendBuffer(&u8g2);
 /*mpu6050初始化*/
 	// while(MPU_Init()){printf("mpu6050 init error!\r\n");Delay_ms(500);}
+	dmp_result = mpu_dmp_init();
+	if(dmp_result != 0)
+	{//有错误
+		printf("DMP Init error->%d\r\n",dmp_result);
+		Delay_ms(500);//在获取fifo数据时，若获取失败，不要延时，避免fifo溢出
+	}else{
+		printf("DMP Init Success!\r\n");
+	}
 /*任务滴答*/
 	timer2_init();
 	printf("system init success!!!\r\n");
@@ -288,7 +338,7 @@ void TIM2_IRQHandler(void)//1ms
 		if(second_cnt<1000)second_cnt++;
 		if(ms_cnt<100)ms_cnt++;
 		if(key_cnt<10)key_cnt++;
-		if(ms_25_cnt<25)ms_25_cnt++;
+		if(ms_25_cnt<dmp_get_fifo)ms_25_cnt++;
 		TIM_ClearITPendingBit(TIM2,TIM_IT_Update);
 	}
 }

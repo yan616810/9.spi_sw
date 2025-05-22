@@ -82,15 +82,11 @@
 #define MPU_DEVICE_ID_REG		0X75	//器件ID寄存器
 
 
-//因为模块AD0默认接GND,所以转为读写地址后,为0XD1和0XD0(如果接VCC,则为0XD3和0XD2)  
-//#define MPU_READ    				0XD1
-//#define MPU_WRITE   				0XD0
-
-u8 MPU_Init(void); 															//初始化MPU6050
+u8 MPU_Init(void); 						//初始化MPU6050
 u8 MPU_Write_Len(u8 reg,u8 len,u8 *buf);//IIC连续写
 u8 MPU_Read_Len(u8 reg,u8 len,u8 *buf); //IIC连续读 
 u8 MPU_Write_Byte(u8 reg,u8 data);		//IIC写一个字节
-u8 MPU_Read_Byte(u8 reg);												//IIC读一个字节
+u8 MPU_Read_Byte(u8 reg);				//IIC读一个字节
 
 u8 MPU_Set_Gyro_Fsr(u8 fsr);
 u8 MPU_Set_Accel_Fsr(u8 fsr);
